@@ -1,181 +1,158 @@
-/*
-  Tic-Tac-Toe (2-player) for Arduino Uno + 20x4 I2C LCD + 4x4 Keypad
-  From your project PDF:
-  - Keypad pins 1-8 -> Arduino D2-D9
-  - I2C LCD:
-      SDA -> A4
-      SCL -> A5
-      VCC -> 5V
-      GND -> GND
-  Controls:
-  - Press 1..9 to place mark in that cell
-  - Press # to reset anytime
-  Libraries needed (install via Arduino Library Manager):
-  - "Keypad" by Mark Stanley, Alexander Brevig
-  - "LiquidCrystal I2C" (common variants work; this sketch uses LiquidCrystal_I2C.h)
-*/
+#include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <Keypad.h>
-#include <LiquidCrystal_I2C.h>
-// Many 20x4 I2C LCD backpacks use 0x27; some use 0x3F.
-// If your LCD shows nothing, try changing to 0x3F.
-static const uint8_t LCD_ADDR = 0x27;
-static const uint8_t LCD_COLS = 20;
-static const uint8_t LCD_ROWS = 4;
-LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
-// 4x4 keypad wiring: pins 1-8 to D2-D9 (rows then cols)
-static const byte ROWS = 4;
-static const byte COLS = 4;
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1 
+#define SCREEN_ADDRESS 0x3C 
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// --- KEYPAD CONFIGURATION ---
+const byte ROWS = 4;
+const byte COLS = 4;
 char keys[ROWS][COLS] = {
   {'1', '2', '3', 'A'},
   {'4', '5', '6', 'B'},
   {'7', '8', '9', 'C'},
   {'*', '0', '#', 'D'}
 };
-// Assumption (common): keypad pin order is R1 R2 R3 R4 C1 C2 C3 C4
-// With PDF wiring "pins 1-8 -> D2-D9", we map:
-// - Rows: D2..D5
-// - Cols: D6..D9
-byte rowPins[ROWS] = {2, 3, 4, 5};
-byte colPins[COLS] = {6, 7, 8, 9};
+
+// Double-check these physical pins on your Arduino Uno
+byte rowPins[ROWS] = {9, 8, 7, 6}; 
+byte colPins[COLS] = {5, 10, 3, 2}; 
+
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
-char board[9];
-char currentPlayer = 'X';
-bool gameOver = false;
-unsigned long gameOverAtMs = 0;
-static const unsigned long AUTO_RESET_MS = 5000;
-void resetGame();
-void drawBoard();
-bool isCellTaken(uint8_t idx);
-bool hasWinner(char p);
-bool isDraw();
-void showStatusLine(const char* msg);
-void renderRow(uint8_t lcdRow, uint8_t baseIdx);
+
+// --- GAME VARIABLES ---
+char board[3][3];
+char currentPlayer;
+int moves;
+bool gameOver;
+
 void setup() {
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Tic-Tac-Toe");
-  lcd.setCursor(0, 1);
-  lcd.print("1-9 move  #=RST");
-  delay(1200);
+  Serial.begin(9600);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    for(;;); 
+  }
   resetGame();
 }
+
 void loop() {
-  // Auto-reset after result
-  if (gameOver && (millis() - gameOverAtMs >= AUTO_RESET_MS)) {
-    resetGame();
-  }
-  char k = keypad.getKey();
-  if (!k) return;
-  if (k == '#') {
-    resetGame();
-    return;
-  }
-  if (gameOver) {
-    // Ignore moves until reset
-    return;
-  }
-  if (k < '1' || k > '9') {
-    // Ignore non-move keys
-    return;
-  }
-  uint8_t idx = (uint8_t)(k - '1');
-  if (isCellTaken(idx)) {
-    showStatusLine("Taken! Pick another.");
-    return;
-  }
-  board[idx] = currentPlayer;
-  drawBoard();
-  if (hasWinner(currentPlayer)) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(currentPlayer);
-    lcd.print(" wins!");
-    lcd.setCursor(0, 1);
-    lcd.print("#=reset  auto 5s");
-    gameOver = true;
-    gameOverAtMs = millis();
-    return;
-  }
-  if (isDraw()) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("It's a tie!");
-    lcd.setCursor(0, 1);
-    lcd.print("#=reset  auto 5s");
-    gameOver = true;
-    gameOverAtMs = millis();
-    return;
-  }
-  // Next player
-  currentPlayer = (currentPlayer == 'X') ? 'O' : 'X';
-  drawBoard();
-}
-void resetGame() {
-  for (uint8_t i = 0; i < 9; i++) {
-    board[i] = (char)('1' + i); // show numbers for empty cells
-  }
-  currentPlayer = 'X';
-  gameOver = false;
-  gameOverAtMs = 0;
-  drawBoard();
-}
-void drawBoard() {
-  lcd.clear();
-  // Status row (20 cols)
-  lcd.setCursor(0, 0);
-  lcd.print("Turn: ");
-  lcd.print(currentPlayer);
-  lcd.print("   #=RST");
-  // Grid rows
-  renderRow(1, 0);
-  renderRow(2, 3);
-  renderRow(3, 6);
-}
-void renderRow(uint8_t lcdRow, uint8_t baseIdx) {
-  lcd.setCursor(0, lcdRow);
-  // Format: " 1 | 2 | 3" (or X/O)
-  lcd.print(' ');
-  lcd.print(board[baseIdx + 0]);
-  lcd.print(" | ");
-  lcd.print(board[baseIdx + 1]);
-  lcd.print(" | ");
-  lcd.print(board[baseIdx + 2]);
-  // Clear remainder of line if needed
-  // Printed width is 10 characters: " " + c + " | " + c + " | " + c
-  for (uint8_t i = 0; i < (LCD_COLS - 10); i++) lcd.print(' ');
-}
-void showStatusLine(const char* msg) {
-  // Put message on row 0 temporarily, then redraw after a short pause
-  lcd.setCursor(0, 0);
-  lcd.print("                    "); // clear 20 chars
-  lcd.setCursor(0, 0);
-  lcd.print(msg);
-  delay(700);
-  drawBoard();
-}
-bool isCellTaken(uint8_t idx) {
-  return (board[idx] == 'X' || board[idx] == 'O');
-}
-bool hasWinner(char p) {
-  // 8 winning lines
-  const uint8_t w[8][3] = {
-    {0, 1, 2}, {3, 4, 5}, {6, 7, 8}, // rows
-    {0, 3, 6}, {1, 4, 7}, {2, 5, 8}, // cols
-    {0, 4, 8}, {2, 4, 6}             // diagonals
-  };
-  for (uint8_t i = 0; i < 8; i++) {
-    if (board[w[i][0]] == p && board[w[i][1]] == p && board[w[i][2]] == p) {
-      return true;
+  char key = keypad.getKey();
+
+  if (key) {
+    // Global Reset Button (D)
+    if (key == 'D') {
+      resetGame();
+      return;
+    }
+
+    if (!gameOver) {
+      handleInput(key);
+    } else {
+      resetGame(); // Press any other key to restart after game ends
     }
   }
-  return false;
 }
-bool isDraw() {
-  for (uint8_t i = 0; i < 9; i++) {
-    if (!isCellTaken(i)) return false;
+
+void handleInput(char key) {
+  int r = -1, c = -1;
+  // Map 1-9 to array indices
+  if (key >= '1' && key <= '9') {
+    int num = key - '1'; 
+    r = num / 3;
+    c = num % 3;
+  } else {
+    return; // Ignore A, B, C, *, 0, #
   }
-  return true;
+
+  if (board[r][c] == ' ') {
+    board[r][c] = currentPlayer;
+    moves++;
+    
+    if (checkWin()) {
+      drawBoard();
+      displayWinner(currentPlayer);
+      gameOver = true;
+    } else if (moves >= 9) {
+      drawBoard();
+      displayWinner('T'); 
+      gameOver = true;
+    } else {
+      currentPlayer = (currentPlayer == 'X') ? 'O' : 'X';
+      drawBoard();
+    }
+  }
+}
+
+void resetGame() {
+  for(int i=0; i<3; i++) {
+    for(int j=0; j<3; j++) board[i][j] = ' ';
+  }
+  currentPlayer = 'X';
+  moves = 0;
+  gameOver = false;
+  drawBoard();
+}
+
+void drawBoard() {
+  display.clearDisplay();
+  
+  // --- UI Layout (Yellow vs Blue) ---
+  // Yellow Header (Top 16 pixels)
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  if (!gameOver) {
+    display.print("TURN: "); display.print(currentPlayer);
+    display.setCursor(80, 0); display.print("RESET:[D]");
+  } else {
+    display.print("GAME OVER!");
+  }
+
+  // Blue Game Area (The Grid)
+  // Shifted grid down to Y=18 to clear the "yellow streak"
+  display.drawFastVLine(42, 18, 46, SSD1306_WHITE);
+  display.drawFastVLine(84, 18, 46, SSD1306_WHITE);
+  display.drawFastHLine(0, 33, 128, SSD1306_WHITE);
+  display.drawFastHLine(0, 49, 128, SSD1306_WHITE);
+
+  for(int i=0; i<3; i++) {
+    for(int j=0; j<3; j++) {
+      int x = j * 42 + 15;
+      int y = i * 16 + 20; 
+      if(board[i][j] != ' ') {
+        display.setCursor(x, y);
+        display.setTextSize(2);
+        display.print(board[i][j]);
+      }
+    }
+  }
+  display.display();
+}
+
+void displayWinner(char winner) {
+  // Briefly overlay the result on the bottom blue section
+  display.fillRect(0, 18, 128, 46, SSD1306_BLACK); 
+  display.setTextSize(2);
+  display.setCursor(20, 30);
+  if (winner == 'T') display.print(" DRAW!");
+  else {
+    display.print("WINNER: "); display.print(winner);
+  }
+  display.display();
+}
+
+bool checkWin() {
+  for(int i=0; i<3; i++) {
+    if(board[i][0] != ' ' && board[i][0] == board[i][1] && board[i][1] == board[i][2]) return true;
+    if(board[0][i] != ' ' && board[0][i] == board[1][i] && board[1][i] == board[2][i]) return true;
+  }
+  if(board[0][0] != ' ' && board[0][0] == board[1][1] && board[1][1] == board[2][2]) return true;
+  if(board[0][2] != ' ' && board[0][2] == board[1][1] && board[1][1] == board[2][0]) return true;
+  return false;
 }
