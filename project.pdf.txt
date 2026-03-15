@@ -1,0 +1,87 @@
+                Project Demo-I
+CSE350 : Digital Electronics and Pulse Techniques
+
+
+
+  Project Title (SL 2): - Game Development Using Arduino
+
+
+
+
+             Group No: 06 ; Section: 4B
+                      Fall 2025
+     ID                             Name
+
+
+ 21201694                    S M ASHRAFUL HUQ
+
+
+ 22201626              MOHAMMAD MUTOASITUZZAMAN
+
+
+ 23301373                     MD SAMSUL HUDA
+
+
+ 23101441                   TARANNUM AL AKIDA
+            TIC-TAC-TOE Game Implementation Using Arduino
+
+
+Abstract:
+
+
+
+The following report presents the design and development of an interactive two-player
+Tic-Tac-Toe game using Arduino. Basically, this project aims to combine the hardware
+components with logical programming to create an engaging, standalone digital gaming system.
+The setup consists of a digital display that visually represents the 3×3 game grid and provides a
+real-time feedback along with a keypad interface that allows players to input their moves
+alternately as “X” or “O” in the game. Basically, the system’s logic is implemented through the
+Arduino IDE which handles player turns, validates inputs, detects win or draw conditions and
+resets the game upon completion. Once a player successfully aligns three identical symbols in a
+row, column or diagonal or when the grid is filled without a winner, the game concludes with the
+appropriate result displayed like Win, Lose or Tie.
+
+However, this project demonstrates the effective integration of hardware and software in digital
+systems which illustrates how a user interaction can be captured through analog inputs and
+processed into digital signals. Not only in gaming but also the same principles can be applied to a
+wide range of real world applications which require user input and automated control such as
+access control systems, vending machines or elevator floor selectors etc.
+Circuit Implementation using Tinkercad:
+
+
+
+
+Here the following image shows the TIC-TAC-TOE circuit implementation with the help of
+Arduino Uno.
+
+
+
+
+List of Components:
+
+
+The components required for this system are as follows:
+   1.​ Arduino Uno R3
+   2.​ 20 Character 4 Line LCD Display Module
+   3.​ 12C LCD Display Adapter
+   4.​ 4x4 Keypad
+   5.​ Jumper Wires
+Components Ordered :
+
+
+
+
+       The following image shows the receipt of components that have been ordered.
+Process Description:
+
+
+   1.​ Connect Keypad pins 1-8 to D2-D9 of the Arduino
+   2.​ Attach the 12C module to the LCD Display
+   3.​ Make the following connections to the LCD with 12C converter and Arduino:
+          a.​ SDA Pin to A4 Pin
+          b.​ SCL Pin to A5 Pin
+          c.​ VCC to 5V
+          d.​ GND Pin to GND
+   4.​ Connect Arduino Uno to a Computer and implement the game instruction Sketch using
+      Arduino IDE.
+
